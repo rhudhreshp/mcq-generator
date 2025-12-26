@@ -300,14 +300,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1️⃣ Convert PDF to buffer (in memory only)
+    // 1️⃣ Convert PDF to buffer (in memory only)g
     const arrayBuffer = await pdfBlob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     // 2️⃣ Call PDF worker with buffer via stdin (entirely in memory)
     const { spawn } = await import("child_process");
     const stdout = await new Promise<string>((resolve, reject) => {
-      const workerPath = path.join(process.cwd(), "pdf-worker", "extract.js");
+      // Build the worker path at runtime using concatenation to avoid
+      // bundler/Turbopack static analysis attempting to resolve it at build time.
+      const parts = [process.cwd(), "pdf-worker", "extract.js"];
+      const workerPath = parts.join(path.sep);
       const child = spawn("node", [workerPath]);
       let output = "";
       let errorOutput = "";
