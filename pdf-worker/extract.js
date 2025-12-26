@@ -1,21 +1,27 @@
-const fs = require("fs");
 const pdfParse = require("pdf-parse");
 
-async function extractPdf(filePath) {
-  const buffer = fs.readFileSync(filePath);
-  const data = await pdfParse(buffer);
-  console.log(data.text);
+async function extractPdf(bufferData) {
+  const data = await pdfParse(bufferData);
+  return data.text;
 }
 
-// Get file path from command line
-const filePath = process.argv[2];
+// Get base64 encoded PDF from stdin
+let inputData = "";
 
-if (!filePath) {
-  console.error("No file path provided");
-  process.exit(1);
-}
+process.stdin.setEncoding("utf-8");
+process.stdin.on("data", (chunk) => {
+  inputData += chunk;
+});
 
-extractPdf(filePath).catch((err) => {
-  console.error(err);
-  process.exit(1);
+process.stdin.on("end", async () => {
+  try {
+    // Decode base64 to buffer
+    const buffer = Buffer.from(inputData.trim(), "base64");
+    const text = await extractPdf(buffer);
+    console.log(text);
+    process.exit(0);
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
 });

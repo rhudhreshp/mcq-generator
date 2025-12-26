@@ -1,9 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
-import { join } from "path";
-import { execFile } from "child_process";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
@@ -235,9 +233,8 @@ import PDFDocument from "pdfkit";
 
 
 async function generateMcqPdf(
-  mcqs: any[],
-  outputPath: string
-): Promise<string> {
+  mcqs: any[]
+): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     const doc = new PDFDocument({
       size: "A4",
@@ -255,40 +252,9 @@ async function generateMcqPdf(
     const chunks: Buffer[] = [];
 
     doc.on("data", (chunk) => chunks.push(chunk));
-    doc.on("end", async () => {
-      try {
-        const pdfBuffer = Buffer.concat(chunks);
-        const fileName = `mcq-${Date.now()}.pdf`;
-
-        // Upload to Supabase Storage
-        const { data, error } = await supabase.storage
-          .from("mcq-pdfs")
-          .upload(fileName, pdfBuffer, {
-            contentType: "application/pdf",
-            upsert: false,
-          });
-
-        if (error) {
-          console.error("Supabase upload error:", error);
-          reject(error);
-          return;
-        }
-
-        // create signed URL valid for 60 seconds
-        const { data: signedData, error: signedErr } = await supabase.storage
-          .from("mcq-pdfs")
-          .createSignedUrl(fileName, 60);
-
-        if (signedErr) {
-          console.error("Signed URL error:", signedErr);
-          reject(signedErr);
-          return;
-        }
-
-        resolve(signedData.signedUrl);
-      } catch (err) {
-        reject(err);
-      }
+    doc.on("end", () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      resolve(pdfBuffer);
     });
 
     doc.on("error", reject);
@@ -326,8 +292,6 @@ export async function POST(request: Request) {
     const requestedMcqs = Number(formData.get("mcqCount") || 10);
     const pdfBlob = formData.get("pdf");
 
-    
-
     if (!pdfBlob || !(pdfBlob instanceof Blob)) {
       return NextResponse.json(
         { success: false, message: "Invalid PDF upload" },
@@ -335,23 +299,35 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1️⃣ Save PDF to temp file
+    // 1️⃣ Convert PDF to buffer (in memory only)
     const arrayBuffer = await pdfBlob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const tempFilePath = join(
-      process.cwd(),
-      "tmp-upload.pdf"
-    );
+    // 2️⃣ Call PDF worker with buffer via stdin (entirely in memory)
+    const stdout = await new Promise<string>((resolve, reject) => {
+      const child = spawn("node", ["pdf-worker/extract.js"]);
+      let output = "";
+      let errorOutput = "";
 
-    await writeFile(tempFilePath, buffer);
+      child.stdout?.on("data", (data) => {
+        output += data.toString();
+      });
 
-    // 2️⃣ Call PDF worker
-    const { stdout } = await execFileAsync(
-      "node",
-      ["pdf-worker/extract.js", tempFilePath],
-      { maxBuffer: 10 * 1024 * 1024 } // 10MB
-    );
+      child.stderr?.on("data", (data) => {
+        errorOutput += data.toString();
+      });
+
+      child.on("close", (code) => {
+        if (code !== 0) {
+          reject(new Error(`Process exited with code ${code}: ${errorOutput}`));
+        } else {
+          resolve(output);
+        }
+      });
+
+      child.stdin?.write(buffer.toString("base64"));
+      child.stdin?.end();
+    });
 
     // 3️⃣ stdout = extracted text
     const extractedText = stdout.trim();
@@ -364,12 +340,7 @@ if (requestedMcqs < chunks.length) {
     requestedMcqs
   );
 
-    // 🔍 DEBUG: save full extracted text to file
-    await writeFile(
-  "debug-chunks.json",
-  JSON.stringify(chunks, null, 2),
-  "utf-8"
-);
+
 
 
 
@@ -404,12 +375,37 @@ for (let i = 0; i < chunks.length; i++) {
 // Trim to requested MCQ count
 allMcqs = allMcqs.slice(0, requestedMcqs);
 
-const pdfUrl = await generateMcqPdf(allMcqs, "");
+// Generate MCQ PDF in memory and upload to Supabase
+const pdfBuffer = await generateMcqPdf(allMcqs);
+const fileName = `mcq-${Date.now()}.pdf`;
+
+// Upload to Supabase Storage
+const { data, error } = await supabase.storage
+  .from("mcq-pdfs")
+  .upload(fileName, pdfBuffer, {
+    contentType: "application/pdf",
+    upsert: false,
+  });
+
+if (error) {
+  console.error("Supabase upload error:", error);
+  throw error;
+}
+
+// Create signed URL valid for 60 seconds
+const { data: signedData, error: signedErr } = await supabase.storage
+  .from("mcq-pdfs")
+  .createSignedUrl(fileName, 60);
+
+if (signedErr) {
+  console.error("Signed URL error:", signedErr);
+  throw signedErr;
+}
 
 return NextResponse.json({
   success: true,
   totalMcqs: allMcqs.length,
-  downloadUrl: pdfUrl,
+  downloadUrl: signedData.signedUrl,
 });
 
 
