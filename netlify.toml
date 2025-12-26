@@ -2,5 +2,9 @@
   command = "npm run build"
   publish = ".next"
 
+[build.environment]
+  NODE_OPTIONS = "--no-deprecation"
+
+  
 [[plugins]]
   package = "@netlify/plugin-nextjs"
