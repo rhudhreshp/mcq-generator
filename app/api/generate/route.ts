@@ -1,14 +1,9 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { execFile } from "child_process";
-import path from "path";
-import { promisify } from "util";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
-
-
-const execFileAsync = promisify(execFile);
+import pdfParse from "pdf-parse";
 
 // SUPABASE CLIENT - Use service role key for uploads
 const supabase = createClient(
@@ -300,45 +295,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1️⃣ Convert PDF to buffer (in memory only)g
+    // 1️⃣ Convert PDF to buffer (in memory only)
     const arrayBuffer = await pdfBlob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 2️⃣ Call PDF worker with buffer via stdin (entirely in memory)
-    const { spawn } = await import("child_process");
-    const stdout = await new Promise<string>((resolve, reject) => {
-      // Build the worker path at runtime using concatenation to avoid
-      // bundler/Turbopack static analysis attempting to resolve it at build time.
-      const parts = [process.cwd(), "pdf-worker", "extract.js"];
-      const workerPath = parts.join(path.sep);
-      const child = spawn("node", [workerPath]);
-      let output = "";
-      let errorOutput = "";
-
-      child.stdout?.on("data", (data) => {
-        output += data.toString();
-      });
-
-      child.stderr?.on("data", (data) => {
-        errorOutput += data.toString();
-      });
-
-      child.on("close", (code) => {
-        if (code !== 0) {
-          reject(new Error(`Process exited with code ${code}: ${errorOutput}`));
-        } else {
-          resolve(output);
-        }
-      });
-
-      child.stdin?.write(buffer.toString("base64"));
-      child.stdin?.end();
-    });
-
-    // 3️⃣ stdout = extracted text
-    const extractedText = stdout.trim();
-const cleanedText = cleanExtractedText(extractedText);
-let chunks = chunkText(cleanedText);
+    // 2️⃣ Extract text from PDF directly (in-process using pdf-parse)
+    const pdfData = await pdfParse(buffer);
+    const extractedText = pdfData.text;
+    // 3️⃣ Clean and chunk extracted text
+    const cleanedText = cleanExtractedText(extractedText);
+    let chunks = chunkText(cleanedText);
 
 if (requestedMcqs < chunks.length) {
   chunks = reduceChunksSymmetrically(
