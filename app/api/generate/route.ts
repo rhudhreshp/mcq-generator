@@ -295,9 +295,11 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(arrayBuffer);
 
     // 2️⃣ Extract text from PDF directly (in-process using pdf-parse v1)
-    const pdfParse = await import('pdf-parse');
-    const pdfData = await pdfParse.default(buffer);
-    const extractedText = pdfData.text;
+    // Handle both CJS and ESM interop shapes returned by `import()`.
+    const pdfParseModule = (await import('pdf-parse')) as any;
+    const pdfParseFunc = pdfParseModule?.default ?? pdfParseModule;
+    const pdfData = await pdfParseFunc(buffer);
+    const extractedText = pdfData?.text ?? '';
     // 3️⃣ Clean and chunk extracted text
     const cleanedText = cleanExtractedText(extractedText);
     let chunks = chunkText(cleanedText);
