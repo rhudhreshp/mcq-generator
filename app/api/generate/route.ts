@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { execFile, spawn } from "child_process";
+import { execFile } from "child_process";
 import path from "path";
 import { promisify } from "util";
 import OpenAI from "openai";
@@ -305,6 +305,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(arrayBuffer);
 
     // 2️⃣ Call PDF worker with buffer via stdin (entirely in memory)
+    const { spawn } = await import("child_process");
     const stdout = await new Promise<string>((resolve, reject) => {
       const workerPath = path.join(process.cwd(), "pdf-worker", "extract.js");
       const child = spawn("node", [workerPath]);
