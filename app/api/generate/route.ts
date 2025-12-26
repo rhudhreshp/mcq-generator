@@ -3,7 +3,8 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
-import pdfParse from "pdf-parse";
+// `pdf-parse` is dynamically imported inside the request handler to avoid
+// triggering browser-specific polyfills at build-time in Next.js.
 
 // SUPABASE CLIENT - Use service role key for uploads
 const supabase = createClient(
@@ -232,18 +233,14 @@ async function generateMcqPdf(
   mcqs: any[]
 ): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
-    const doc = new PDFDocument({
-      size: "A4",
-      margin: 50,
-      font: "Roboto.ttf",
-    });
+      const doc = new PDFDocument({
+        size: "A4",
+        margin: 50,
+      });
 
-    doc.registerFont(
-      "Roboto",
-      "fonts/Roboto.ttf"
-    );
-
-    doc.font("Roboto");
+      // Use a built-in PDFKit font to avoid relying on a local font file
+      // which may not exist in serverless environments.
+      doc.font("Helvetica");
 
     const chunks: Buffer[] = [];
 
@@ -299,9 +296,11 @@ export async function POST(request: Request) {
     const arrayBuffer = await pdfBlob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 2️⃣ Extract text from PDF directly (in-process using pdf-parse)
-    const pdfData = await pdfParse(buffer);
-    const extractedText = pdfData.text;
+    // 2️⃣ Extract text from PDF directly (in-process using pdf-parse v2+)
+    const { PDFParse } = await import('pdf-parse');
+    const parser = new PDFParse({ data: buffer });
+    const textResult = await parser.getText();
+    const extractedText = textResult.text;
     // 3️⃣ Clean and chunk extracted text
     const cleanedText = cleanExtractedText(extractedText);
     let chunks = chunkText(cleanedText);
