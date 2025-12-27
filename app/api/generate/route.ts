@@ -3,6 +3,18 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import path from "path";
+import fs from "fs";
+
+// 🔥 Disable PDFKit default fonts (Helvetica, Times, Courier)
+const PDFKit = require("pdfkit/js/pdfkit.standalone.js");
+
+// Replace default font data loader
+PDFKit.prototype._fontFamilies = {};
+
+import PDFDocument from "pdfkit";
+
+
 
 // SUPABASE CLIENT - Use service role key for uploads
 const supabase = createClient(
@@ -224,30 +236,35 @@ function reduceChunksSymmetrically(
   return keep;
 }
 
-import PDFDocument from "pdfkit";
-
-
 async function generateMcqPdf(
   mcqs: any[]
 ): Promise<Buffer> {
-  return new Promise(async (resolve, reject) => {
-      const doc = new PDFDocument({
-        size: "A4",
-        margin: 50,
+  return new Promise((resolve, reject) => {
+
+const fontPath = path.resolve(process.cwd(), "fonts", "Roboto.ttf");
+
+    if (!fs.existsSync(fontPath)) {
+      return reject(
+        new Error("Font file not found: fonts/Roboto.ttf")
+      );
+    }
+
+    // ✅ Create document WITHOUT default fonts
+    const doc = new PDFDocument({
+      autoFirstPage: false,
+      font: fontPath, // This stops it from looking for Helvetica
       });
+    // ✅ Register font
+    doc.registerFont("Roboto", fontPath);
+     doc.font("Roboto");
 
-      // Use a built-in PDFKit font to avoid relying on a local font file
-      // which may not exist in serverless environments.
-      doc.font("Helvetica");
+    // ✅ Add page AFTER registering font
+    doc.addPage({ size: "A4", margin: 50 });
 
+    // Collect PDF data
     const chunks: Buffer[] = [];
-
     doc.on("data", (chunk) => chunks.push(chunk));
-    doc.on("end", () => {
-      const pdfBuffer = Buffer.concat(chunks);
-      resolve(pdfBuffer);
-    });
-
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
     // Title

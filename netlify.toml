@@ -5,6 +5,9 @@
 [build.environment]
   NODE_OPTIONS = "--no-deprecation"
 
+[functions]
+  # This tells Netlify: "Whatever happens, make sure the fonts folder is available to functions"
+  included_files = ["fonts/**"]
   
 [[plugins]]
   package = "@netlify/plugin-nextjs"
