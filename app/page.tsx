@@ -94,7 +94,7 @@ export default function Home() {
         </p>
 
         {/* CTA */}
-        <Link href="/generate">
+        <Link href="/mcqgen">
           <button
             style={{
               padding: "12px 28px",
