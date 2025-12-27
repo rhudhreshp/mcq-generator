@@ -241,7 +241,7 @@ async function generateMcqPdf(
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
 
-const fontPath = path.resolve(process.cwd(), "fonts", "Roboto.ttf");
+const fontPath = path.join(process.cwd(), "fonts", "Roboto.ttf");
 
     if (!fs.existsSync(fontPath)) {
       return reject(
