@@ -288,6 +288,18 @@ const fontPath = path.resolve(process.cwd(), "fonts", "Roboto.ttf");
       doc.moveDown();
     });
 
+    // Add Answer Key Page
+    doc.addPage({ size: "A4", margin: 50 });
+
+    doc
+      .fontSize(18)
+      .text("Answer Key", { align: "center" })
+      .moveDown(2);
+
+    mcqs.forEach((mcq, index) => {
+      doc.fontSize(12).text(`${index + 1}. ${mcq.correctAnswer}`);
+    });
+
     doc.end();
   });
 }

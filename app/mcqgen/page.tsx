@@ -277,6 +277,43 @@ const progressInterval = setInterval(() => {
             </button>
           </div>
         )}
+
+        {/* About Developer Section */}
+        <div
+          style={{
+            marginTop: "40px",
+            borderTop: "1px solid",
+            borderColor: darkMode ? "#334155" : "#e2e8f0",
+            paddingTop: "20px",
+            textAlign: "center",
+          }}
+        >
+          <h3 style={{ fontSize: "16px", fontWeight: 600, color: textColor, marginBottom: "8px" }}>
+            About Developer
+          </h3>
+          <p style={{ fontSize: "14px", fontWeight: 600, color: textColor, marginBottom: "4px" }}>
+            Rhudhresh P
+          </p>
+          <p style={{ fontSize: "13px", color: muted, marginBottom: "4px" }}>
+            First Year BS-MS Student at IISER Bhopal
+          </p>
+          <p style={{ fontSize: "13px", color: muted, marginBottom: "4px" }}>
+            Enthusiast in Science and Technology
+          </p>
+          <p style={{ fontSize: "13px", color: muted }}>
+            Email: rhudhresh25@iiserb.ac.in
+          </p>
+          <div
+            style={{
+              marginTop: "10px",
+              display: "flex",
+              justifyContent: "center",
+              gap: "15px",
+            }}
+          >
+           
+          </div>
+        </div>
       </div>
     </div>
   );
